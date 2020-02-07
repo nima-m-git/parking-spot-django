@@ -67,41 +67,101 @@ class Stats():
     
     def prob_per_time_visual(request):
         if 'time_choice' in request.GET:
-            chosen_time = request.GET.get('time')
-            # get dataframe from query equivalent 'SELECT SPOT, PROBABILITY, STD, ENTRIES FROM parking_spot_stats WHERE TIME = {}'.format(time))
-            data = read_frame(Statistics.objects.all().filter(time=chosen_time))
-            data['std'] = data['std']/2
+            chosen_time = request.GET.getlist('time')
+            if len(chosen_time) == 1:
+                # get dataframe from query equivalent 'SELECT SPOT, PROBABILITY, STD, ENTRIES FROM parking_spot_stats WHERE TIME = {}'.format(time))
+                data = read_frame(Statistics.objects.all().filter(time=chosen_time))
+                data['std'] = data['std']/2
 
-            fig = px.bar(data, 
-                    x='spot', 
-                    y='probability', 
-                    error_y='std',
-                    hover_data=['entries'], 
-                    width=1600, height=600,  
-                    color='entries', 
-                    color_continuous_scale='RdBu',
-                ) 
+                fig = px.bar(data, 
+                        x='spot', 
+                        y='probability', 
+                        error_y='std',
+                        hover_data=['entries'], 
+                        width=1600, height=600,  
+                        color='entries', 
+                        color_continuous_scale='RdBu',
+                    ) 
+                fig.update_layout(
+                    title={
+                        'text':'{}Hs'.format(chosen_time),
+                        'y':1.0,
+                        'x':0.5,
+                        'font':{
+                            'size': 28},
+                        },
+                    xaxis_title="Spot",
+                    xaxis_tickmode='linear',
+                    yaxis_title="Probability",
+                    font=dict(
+                        family="Courier New, monospace",
+                        size=16,
+                        color="#000000"
+                        ),
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    )
+                plot_div = plot(fig, output_type='div', include_plotlyjs=False)
+                return render(request, 'parking_spot/graph.html', context={'plot_div': plot_div})
+        if 'time_range' in request.GET:
+            chosen_time = request.GET.getlist('time')
+            if chosen_time[0] < chosen_time[1]:
+                time_range = [i for i in range(chosen_time[0],24)] + [i for i in range(0, chosen_time[1]+1)]
+            else:
+                time_range = [i for i in range(chosen_time[0], chosen_time[1])]
+            data = read_frame(Statistics.objects.all().filter(time__in=time_range))
+
+            fig = px.scatter(data,
+                x='time', 
+                y='probability', 
+                hover_name='spot',
+                color='spot',
+                color_continuous_scale='purp',
+                size='entries',
+                hover_data=['entries', 'std'], 
+                width=1600, height=600,
+                error_y='std',  
+            )       
+            fig.update_traces(mode='lines+markers')          
             fig.update_layout(
                 title={
-                    'text':'{}Hs'.format(chosen_time),
+                    'text':'Spots\' Probabiliy change over Time',
                     'y':1.0,
                     'x':0.5,
                     'font':{
                         'size': 28},
                     },
-                xaxis_title="Spot",
-                xaxis_tickmode='linear',
+                xaxis_title="Time (Hours)",
                 yaxis_title="Probability",
                 font=dict(
                     family="Courier New, monospace",
                     size=16,
                     color="#000000"
                     ),
+                xaxis=dict(
+                    tickmode='linear',
+                    ticks='outside',
+                    tick0=0,
+                    dtick=1,
+                    range=[-.5,23.5]
+                    ),
+                yaxis=dict(
+                    tickmode='linear',
+                    ticks='outside',
+                    tick0=0,
+                    dtick=0.25,
+                    range=[-0.01, 1.01]
+                    ),
+                legend=go.layout.Legend(
+                    traceorder="normal",
+                    bordercolor="Black",
+                    borderwidth=1
+                    ),
                 plot_bgcolor='rgba(0,0,0,0)',
-                )
+                )   
             plot_div = plot(fig, output_type='div', include_plotlyjs=False)
             return render(request, 'parking_spot/graph.html', context={'plot_div': plot_div})
 
+        TimeForm().fields['To'].required = False
         return render(request, 'parking_spot/time_form.html', {'form':TimeForm()})
             
 
